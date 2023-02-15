@@ -11,6 +11,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
+#include <AHTxx.h>
 
 //#include <ArduinoJWT.h>
 // OR ?
@@ -25,9 +26,14 @@ const char *password = "<PASSWORD>";
 #define NTP_OFFSET 3600; // UTC+1 (Brussels time CET) = 3600 seconds offset
 #define API_SERVER "example";
 const char api_key[] = "test"; //? const char *api_key = ... ?
+#define leverPin 1 // pin on which the lever is wired // TODO: check pin
 
 // Secret code
 //ArduinoJWT jwt1 = ArduinoJWT("secret");
+  
+// Temp sensor
+AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21)
+float ahtValue; 
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
@@ -35,10 +41,27 @@ NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET);
 // NTP epoch time
 unsigned long epochTime;
 
+unsigned int hum;
+int temp;
+int door;
+
 void setup() {
   // setup wifi, NTP, API, etc
   Serial.begin(115200);
   initWifi();
+  
+  // initially UNKNOWN (2)
+  door = 2;
+  
+  // set lever pin to input (pulled high)
+  pinMode(leverPin,INPUT_PULLUP);
+  
+  // check if aht sensor is working
+  while (aht20.begin() != true) { //for ESP-01 use aht20.begin(0, 2);
+    Serial.println(F("AHT2x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
+    delay(3000); // 3sec
+  }
+  Serial.println(F("AHT20 OK"));
 
   //// --- JWT encode --- :
 //
@@ -62,37 +85,80 @@ void setup() {
   //
   //// ------------------
 
+  // start NTP
   timeClient.begin();
 }
 
 void loop() {
   // check every X seconds/minutes if the lever is closed, and send status with current time
-  Serial.println("Checking lever status");
+  Serial.println(F("Checking lever status"));
+  // updates NTP
   timeClient.update();
+  
+  // check if lever is closed (door open)
+  if ( digitalRead(leverPin) == LOW ) {
+    door = 1; // door is open (lever activated, because pulled high)
+  } else {
+    door = 0;
+  }
+  
+  epochTime = getEpochTime();
 
-  if 
+  String update_time;
+  update_time = statusTime();
+  
+  ahtValue = aht20.readTemperature(); //read 6-bytes via I2C, takes 80 milliseconds
+  Serial.print(F("Temperature: "));
+  if (ahtValue != AHTXX_ERROR) { //AHTXX_ERROR = 255, library returns 255 if error occurs
+    Serial.print(ahtValue);
+    Serial.println(F(" +-0.3C"));
+    temp = round(ahtValue);
+  } else {
+    printAhtStatus(); //print temperature command status
+  }
+  ahtValue = aht20.readHumidity(AHTXX_USE_READ_DATA); //use 6-bytes from temperature reading, takes zero milliseconds!!!
+  Serial.print(F("Humidity...: "));
+  if (ahtValue != AHTXX_ERROR) { //AHTXX_ERROR = 255, library returns 255 if error occurs 
+    Serial.print(ahtValue);
+    Serial.println(F(" +-2%"));
+    hum = round(ahtValue);
+  } else {
+    printAhtStatus(); //print temperature command status not humidity!!! RH measurement use same 6-bytes from T measurement
+  }
+  
+  // send status as json to api server
+  result = sendStatus(&update_time);
+  if (result == 0) {
+    Serial.print(F("sendStatus success"));
+  } else {
+    Serial.print(F("sendStatus error"));
+  }
 
   delay(20000) // 20 seconds
 }
 
 void initWifi() {
   // init wifi
+  
+  // ? needed ? :
+  WiFi.persistent(false);  //disable saving wifi config into SDK flash area
+  WiFi.forceSleepBegin();  //disable AP & station by calling "WiFi.mode(WIFI_OFF)" & put modem to sleep
+  
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.println("Connecting to WiFi")
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  Serial.println(F("Connecting to WiFi"))
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("Connected to the WiFi network, IP:");
+  Serial.println(F("Connected to the WiFi network, IP:"));
   Serial.println(WiFi.localIP());
 }
 
 unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
   // get epoch time from NTP
   unsigned long now = timeClient.getEpochTime();
-  Serial.print("Epoch time: ");
+  Serial.print(F("Epoch time: "));
   Serial.println(now);
   return now;
 }
@@ -100,12 +166,67 @@ unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
 string statusTime() {
   // get formatted string time from NTP
   char now[] = timeClient.getFormattedTime();
-  Serial.print("Formatted time: ");
+  Serial.print(F("Formatted time: "));
   Serial.println(now);
   return now;
 }
 
-int sendStatus() {
+int sendStatus(String* time_human) {
   // send data to api server
+  DynamicJsonDocument json(200);
+  json["door_state"] = door;
+  json["temperature"] = temp;
+  json["humidity"] = hum;
+  json["update_time"] = &time_human;
+  json["update_time_unix"] = time_epoch;
 
+  String jsonData;
+  serializeJson(json, jsonData);
+
+  HTTPClient http;
+  http.begin(API_SERVER);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("api_token", API_KEY);
+  Serial.print(jsonData);
+  int httpResponseCode = http.POST(jsonData);
+  int res;
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println(httpResponseCode);
+    Serial.println(response);
+    res = 0;
+  } else {
+    Serial.println("Error on HTTP request");
+    res = 1;
+  }
+  http.end();
+  return res;
+}
+
+void printAhtStatus() {
+  switch ( aht20.getStatus() ) {
+    case AHTXX_NO_ERROR:
+      Serial.println(F("no error"));
+      break;
+
+    case AHTXX_BUSY_ERROR:
+      Serial.println(F("sensor busy, increase polling time"));
+      break;
+
+    case AHTXX_ACK_ERROR:
+      Serial.println(F("sensor didn't return ACK, not connected, broken, long wires (reduce speed), bus locked by slave (increase stretch limit)"));
+      break;
+
+    case AHTXX_DATA_ERROR:
+      Serial.println(F("received data smaller than expected, not connected, broken, long wires (reduce speed), bus locked by slave (increase stretch limit)"));
+      break;
+
+    case AHTXX_CRC8_ERROR:
+      Serial.println(F("computed CRC8 not match received CRC8, this feature supported only by AHT2x sensors"));
+      break;
+
+    default:
+      Serial.println(F("unknown status"));    
+      break;
+  }
 }
