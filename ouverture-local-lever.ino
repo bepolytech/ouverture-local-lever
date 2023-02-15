@@ -139,11 +139,6 @@ void loop() {
 
 void initWifi() {
   // init wifi
-  
-  // ? needed ? :
-  WiFi.persistent(false);  //disable saving wifi config into SDK flash area
-  WiFi.forceSleepBegin();  //disable AP & station by calling "WiFi.mode(WIFI_OFF)" & put modem to sleep
-  
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.println(F("Connecting to WiFi"))
@@ -151,7 +146,9 @@ void initWifi() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println(F("Connected to the WiFi network, IP:"));
+  Serial.print(F("Connected to the WiFi network: "));
+  Serial.println(ssid);
+  Serial.print(F("IP: "));
   Serial.println(WiFi.localIP());
 }
 
@@ -179,6 +176,7 @@ int sendStatus(String* time_human) {
   json["humidity"] = hum;
   json["update_time"] = &time_human;
   json["update_time_unix"] = time_epoch;
+  //json["presence"] = presence; // from PIR sensor ? nahh
 
   String jsonData;
   serializeJson(json, jsonData);
