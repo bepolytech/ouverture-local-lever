@@ -1,38 +1,43 @@
 /*
  * MIT License
  * by Lucas Placentino
+ * for the Bureau Etudiant de Polytechnique (BEP) ULB
  *
  * Open status lever code for esp8266
  * 
- * Get lever state every X seconds/minutes, send data to api server
+ * Get lever state (and temp&hum data) every X seconds, then send data to api server
  * (then the Wordpress site will get the status from the api server)
  * 
  */
+ 
 #include <ESP8266WiFi.h>
+//TODO check diff between ESP8266WiFi and WiFiUdp ?
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <AHTxx.h>
 
+/*
 //#include <ArduinoJWT.h>
 // OR ?
 //#include <CustomJWT.h>
-char secret_key[] = "tester";
+//char secret_key[] = "tester";
 //char string[] = "{\"temp\":22.5,\"speed\":25.1}";
 //CustomJWT jwt2(secret_key, 256);
-
-const char *ssid = "<SSID>";
-const char *password = "<PASSWORD>";
-#define NTP_SERVER "pool.ntp.org"; // europe.pool.ntp.org ?
-#define NTP_OFFSET 3600; // UTC+1 (Brussels time CET) = 3600 seconds offset
-#define API_SERVER "example";
-const char api_key[] = "test"; //? const char *api_key = ... ?
-#define leverPin 1 // pin on which the lever is wired // TODO: check pin
-
 // Secret code
 //ArduinoJWT jwt1 = ArduinoJWT("secret");
+*/
+
+const char *ssid = "<SSID>"; // wifi ssid
+const char *password = "<PASSWORD>"; // wifi password
+#define NTP_SERVER "pool.ntp.org"; // europe.pool.ntp.org ?
+#define NTP_OFFSET 3600; // UTC+1 (Brussels time CET) = 3600 seconds offset
+#define API_SERVER "https://api.example.org"; // api server url
+const char api_key[] = "test"; //? const char *api_key = ... ?
+#define leverPin 1; // pin on which the lever is wired // TODO: check wemos D1 mini pins
+#define REFRESH_TIME 30000; //ms between each refresh and api call (30sec)
   
 // Temp sensor
-AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21)
+AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21) TODO: check address? (from example)
 float ahtValue; 
 
 // Define NTP Client to get time
@@ -41,16 +46,21 @@ NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET);
 // NTP epoch time
 unsigned long epochTime;
 
+// global vars
 unsigned int hum;
 int temp;
 int door;
 
 void setup() {
   // setup wifi, NTP, API, etc
+
+  // start serial bus
   Serial.begin(115200);
+
+  // start wifi
   initWifi();
   
-  // initially UNKNOWN (2)
+  // initially door is UNKNOWN (=2)
   door = 2;
   
   // set lever pin to input (pulled high)
@@ -63,8 +73,9 @@ void setup() {
   }
   Serial.println(F("AHT20 OK"));
 
+  /* JWT encoding not used
   //// --- JWT encode --- :
-//
+  //
   //// Convert JSON payload to verified JWT
   //char input1[] = "{\"name\": \"John Doe\",\"email\": \"john.doe@example.com\",\"iat\": 1630182518}";
   //int input1Len = jwt1.getJWTLength(input1);
@@ -84,13 +95,14 @@ void setup() {
   //jwt2.clear();
   //
   //// ------------------
+  */
 
   // start NTP
   timeClient.begin();
 }
 
 void loop() {
-  // check every X seconds/minutes if the lever is closed, and send status with current time
+  // check every X seconds if the lever is closed, and send status with current time
   Serial.println(F("Checking lever status"));
   // updates NTP
   timeClient.update();
@@ -102,18 +114,21 @@ void loop() {
     door = 0;
   }
   
+  // update unix time
   epochTime = getEpochTime();
 
+  // update human readable time
   String update_time;
   update_time = statusTime();
   
+  // getting temp and hum data
   ahtValue = aht20.readTemperature(); //read 6-bytes via I2C, takes 80 milliseconds
   Serial.print(F("Temperature: "));
   if (ahtValue != AHTXX_ERROR) { //AHTXX_ERROR = 255, library returns 255 if error occurs
     Serial.print(ahtValue);
     Serial.println(F(" +-0.3C"));
-    temp = round(ahtValue);
-  } else {
+    temp = round(ahtValue); //because temp must be an int
+  } else { // if error occurs
     printAhtStatus(); //print temperature command status
   }
   ahtValue = aht20.readHumidity(AHTXX_USE_READ_DATA); //use 6-bytes from temperature reading, takes zero milliseconds!!!
@@ -121,20 +136,21 @@ void loop() {
   if (ahtValue != AHTXX_ERROR) { //AHTXX_ERROR = 255, library returns 255 if error occurs 
     Serial.print(ahtValue);
     Serial.println(F(" +-2%"));
-    hum = round(ahtValue);
-  } else {
+    hum = round(ahtValue); //because hum must be an int
+  } else { // if error occurs
     printAhtStatus(); //print temperature command status not humidity!!! RH measurement use same 6-bytes from T measurement
   }
   
   // send status as json to api server
   result = sendStatus(&update_time);
+  // checks is error occured on api PUT
   if (result == 0) {
     Serial.print(F("sendStatus success"));
   } else {
     Serial.print(F("sendStatus error"));
   }
 
-  delay(20000) // 20 seconds
+  delay(REFRESH_TIME) // see #defines
 }
 
 void initWifi() {
@@ -161,7 +177,7 @@ unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
 }
 
 string statusTime() {
-  // get formatted string time from NTP
+  // get formatted string time (human readable) from NTP
   char now[] = timeClient.getFormattedTime();
   Serial.print(F("Formatted time: "));
   Serial.println(now);
@@ -171,6 +187,8 @@ string statusTime() {
 int sendStatus(String* time_human) {
   // send data to api server
   DynamicJsonDocument json(200);
+
+  // add data to json packet
   json["door_state"] = door;
   json["temperature"] = temp;
   json["humidity"] = hum;
@@ -184,9 +202,10 @@ int sendStatus(String* time_human) {
   HTTPClient http;
   http.begin(API_SERVER);
   http.addHeader("Content-Type", "application/json");
+  // apply API key as a header named "api_token"
   http.addHeader("api_token", API_KEY);
   Serial.print(jsonData);
-  int httpResponseCode = http.POST(jsonData);
+  int httpResponseCode = http.PUT(jsonData);
   int res;
   if (httpResponseCode > 0) {
     String response = http.getString();
@@ -194,13 +213,16 @@ int sendStatus(String* time_human) {
     Serial.println(response);
     res = 0;
   } else {
-    Serial.println("Error on HTTP request");
+    Serial.println(F("Error on HTTP request"));
+    Serial.println(httpResponseCode);
     res = 1;
   }
   http.end();
+  // return successful api call or not
   return res;
 }
 
+// print temp sensor error if one occurs
 void printAhtStatus() {
   switch ( aht20.getStatus() ) {
     case AHTXX_NO_ERROR:
