@@ -15,7 +15,7 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <AHTxx.h>
-#include <ArduinoJson.h> 
+#include <ArduinoJson.h>
 
 /*
 //#include <ArduinoJWT.h>
@@ -28,14 +28,15 @@
 //ArduinoJWT jwt1 = ArduinoJWT("secret");
 */
 
-const char *ssid = "<SSID>"; // wifi ssid
-const char *password = "<PASSWORD>"; // wifi password
-#define NTP_SERVER "pool.ntp.org"; // europe.pool.ntp.org ?
-#define NTP_OFFSET 3600; // UTC+1 (Brussels time CET) = 3600 seconds offset
-#define API_SERVER "https://api.example.org"; // api server url
-const char api_key[] = "test"; //? const char *api_key = ... ?
-#define leverPin 1; // pin on which the lever is wired // TODO: check wemos D1 mini pins
-#define REFRESH_TIME 30000; //ms between each refresh and api call (30sec)
+#define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
+#define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 3600 seconds offset
+#define API_SERVER "http://localhost:8000/local" // api server url
+#define LEVER_PIN 4 // pin on which the lever is wired // TODO: check wemos D1 mini pins
+#define LED_PIN 2 // built-in LED is GPIO 2 on NodeMCU v3
+#define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
+const char *ssid = "wifi_ssid"; // wifi ssid
+const char *password = "wifi_passwd"; // wifi password
+const char api_key[] = "your_api_key"; //? const char *api_key = ... ?
   
 // Temp sensor
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21) TODO: check address? (from example)
@@ -52,11 +53,14 @@ unsigned int hum;
 int temp;
 int door;
 
+HTTPClient http;
+WiFiClient wifi_client;
+
 void setup() {
   // setup wifi, NTP, API, etc
 
   // start serial bus
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   // start wifi
   initWifi();
@@ -65,7 +69,10 @@ void setup() {
   door = 2;
   
   // set lever pin to input (pulled high)
-  pinMode(leverPin,INPUT_PULLUP);
+  pinMode(LEVER_PIN,INPUT_PULLUP);
+
+  pinMode(LED_PIN,OUTPUT);
+  pinMode(LED_BUILTIN,OUTPUT);
   
   // check if aht sensor is working
   while (aht20.begin() != true) { //for ESP-01 use aht20.begin(0, 2);
@@ -109,10 +116,15 @@ void loop() {
   timeClient.update();
   
   // check if lever is closed (door open)
-  if ( digitalRead(leverPin) == LOW ) {
+  if ( digitalRead(LEVER_PIN) == LOW ) {
     door = 1; // door is open (lever activated, because pulled high)
+    digitalWrite(LED_PIN, LOW); // LED ON, because active low
+    digitalWrite(LED_BUILTIN, LOW);
+    Serial.println("Door is open");
   } else {
     door = 0;
+    digitalWrite(LED_PIN, HIGH); // LED OFF, because active low
+    Serial.println("Door is closed");
   }
   
   // update unix time
@@ -143,22 +155,23 @@ void loop() {
   }
   
   // send status as json to api server
+  int result;
   result = sendStatus(&update_time);
   // checks is error occured on api PUT
-  if (result == 0) {
-    Serial.print(F("sendStatus success"));
+  if ( result == 0) {
+    Serial.println(F("sendStatus success"));
   } else {
-    Serial.print(F("sendStatus error"));
+    Serial.println(F("sendStatus error"));
   }
 
-  delay(REFRESH_TIME) // see #defines
+  delay(REFRESH_TIME); // see #defines
 }
 
 void initWifi() {
   // init wifi
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.println(F("Connecting to WiFi"))
+  Serial.println(F("Connecting to WiFi"));
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -177,9 +190,9 @@ unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
   return now;
 }
 
-string statusTime() {
+String statusTime() {
   // get formatted string time (human readable) from NTP
-  char now[] = timeClient.getFormattedTime();
+  String now = timeClient.getFormattedTime();
   Serial.print(F("Formatted time: "));
   Serial.println(now);
   return now;
@@ -187,25 +200,28 @@ string statusTime() {
 
 int sendStatus(String* time_human) {
   // send data to api server
-  DynamicJsonDocument json(200);
+  DynamicJsonDocument json_doc(200);
+  //StaticJsonDocument<192> json_doc; // prefer static ? 196? fron ArduinoJson Assistant, or 200 ?
 
   // add data to json packet
-  json["door_state"] = door;
-  json["temperature"] = temp;
-  json["humidity"] = hum;
-  json["update_time"] = &time_human;
-  json["update_time_unix"] = time_epoch;
-  //json["presence"] = presence; // from PIR sensor ? nahh
+  json_doc["door_state"] = door;
+  json_doc["temperature"] = temp;
+  json_doc["humidity"] = hum;
+  json_doc["update_time"] = &time_human;
+  json_doc["update_time_unix"] = epochTime;
+  //json_doc["presence"] = presence; // from PIR sensor ? nahh
 
   String jsonData;
-  serializeJson(json, jsonData);
+  serializeJson(json_doc, jsonData);
 
-  HTTPClient http;
-  http.begin(API_SERVER);
+  //HTTPClient http;
+  //WiFiClient wifi_client;
+  // ^^^^ moved as globals
+  http.begin(wifi_client, API_SERVER);
   http.addHeader("Content-Type", "application/json");
   // apply API key as a header named "api_token"
-  http.addHeader("api_token", API_KEY);
-  Serial.print(jsonData);
+  http.addHeader("api_token", api_key);
+  Serial.println(jsonData);
   int httpResponseCode = http.PUT(jsonData);
   int res;
   if (httpResponseCode > 0) {
