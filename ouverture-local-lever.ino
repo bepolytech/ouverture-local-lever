@@ -11,10 +11,11 @@
  */
  
 #include <ESP8266WiFi.h>
-//TODO check diff between ESP8266WiFi and WiFiUdp ?
+#include <ESP8266HTTPClient.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <AHTxx.h>
+#include <ArduinoJson.h> 
 
 /*
 //#include <ArduinoJWT.h>
