@@ -16,27 +16,26 @@
 #include <NTPClient.h>
 #include <AHTxx.h>
 #include <ArduinoJson.h>
+#include <Adafruit_SSD1306.h> //TODO
+#include <Adafruit_GFX.h> // required ?
+#include <SPI.h> // required here (even if we're only using I2C)
+#include <Wire.h>
 
-/*
-//#include <ArduinoJWT.h>
-// OR ?
-//#include <CustomJWT.h>
-//char secret_key[] = "tester";
-//char string[] = "{\"temp\":22.5,\"speed\":25.1}";
-//CustomJWT jwt2(secret_key, 256);
-// Secret code
-//ArduinoJWT jwt1 = ArduinoJWT("secret");
-*/
+// OLED screen
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define OLED_RESET     -1 // Reset pin
+#define SCREEN_ADDRESS 0x3C // I2C address (0X3C or 0x3D ?)
 
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
 #define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 3600 seconds offset
-#define API_SERVER "http://localhost:8000/local" // api server url
+#define API_SERVER "http://192.168.137.100:8000/local" // api server url
 #define LEVER_PIN 4 // pin on which the lever is wired // TODO: check wemos D1 mini pins
 #define LED_PIN 2 // built-in LED is GPIO 2 on NodeMCU v3
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
-const char *ssid = "wifi_ssid"; // wifi ssid
-const char *password = "wifi_passwd"; // wifi password
-const char api_key[] = "your_api_key"; //? const char *api_key = ... ?
+const char *ssid = "wifissid"; // wifi ssid
+const char *password = "wifipasswd"; // wifi password
+const char api_key[] = "yourapikey"; //? const char *api_key = ... ?
   
 // Temp sensor
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21) TODO: check address? (from example)
@@ -56,11 +55,37 @@ int door;
 HTTPClient http;
 WiFiClient wifi_client;
 
+// screen init
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
 void setup() {
   // setup wifi, NTP, API, etc
 
   // start serial bus
   Serial.begin(9600);
+
+  // initialize the OLED object
+  while (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    delay(5000); // Don't proceed, loop forever
+  }
+  // Clear and setup the screen buffer.
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+
+  // draw white screen
+  display.setCursor(0,0);
+  display.fillRect(0, 0, 127, 63, WHITE);
+  display.display();
+  delay(50);
+
+  // Display Setup Text
+  display.clearDisplay();
+  display.setCursor(0,28);
+  display.println(F("Starting up..."));
+  display.display();
+  delay(500);
 
   // start wifi
   initWifi();
@@ -81,32 +106,11 @@ void setup() {
   }
   Serial.println(F("AHT20 OK"));
 
-  /* JWT encoding not used
-  //// --- JWT encode --- :
-  //
-  //// Convert JSON payload to verified JWT
-  //char input1[] = "{\"name\": \"John Doe\",\"email\": \"john.doe@example.com\",\"iat\": 1630182518}";
-  //int input1Len = jwt1.getJWTLength(input1);
-  //char output1[input1Len];
-  //jwt1.encodeJWT(input1, output1);
-  //Serial.println("\nEncoded JWT:");
-  //Serial.println(output1);
-  //
-  //// OR ?
-  //
-  //jwt2.allocateJWTMemory();
-  //jwt2.encodeJWT(string);
-  //Serial.printf("Header: %s\nHeader Length: %d\n", jwt2.header, jwt2.headerLength);
-  //Serial.printf("Payload: %s\nPayload Length: %d\n", jwt2.payload, jwt2.payloadLength);
-  //Serial.printf("Signature: %s\nSignature Length: %d\n", jwt2.signature, jwt2.signatureLength);
-  //Serial.printf("Final Output: %s\nFinalOutput Length: %d\n", jwt2.out, jwt2.outputLength);
-  //jwt2.clear();
-  //
-  //// ------------------
-  */
-
   // start NTP
   timeClient.begin();
+
+  // clear display
+  display.clearDisplay();
 }
 
 void loop() {
@@ -120,11 +124,11 @@ void loop() {
     door = 1; // door is open (lever activated, because pulled high)
     digitalWrite(LED_PIN, LOW); // LED ON, because active low
     digitalWrite(LED_BUILTIN, LOW);
-    Serial.println("Door is open");
+    Serial.println(F("Door is open"));
   } else {
     door = 0;
     digitalWrite(LED_PIN, HIGH); // LED OFF, because active low
-    Serial.println("Door is closed");
+    Serial.println(F("Door is closed"));
   }
   
   // update unix time
@@ -164,22 +168,43 @@ void loop() {
     Serial.println(F("sendStatus error"));
   }
 
+  //display current status on OLED screen
+  displayStatus(result, &update_time);
+
   delay(REFRESH_TIME); // see #defines
 }
 
 void initWifi() {
+  display.clearDisplay();
+  display.setCursor(0,28);
+  display.println(F("Connecting to WiFi"));
+  display.display();
+  delay(100);
+  
   // init wifi
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.println(F("Connecting to WiFi"));
+  display.println("");
+  display.display(); //?
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    Serial.print(F("."));
+    display.print(F("."));
+    display.display();
   }
   Serial.print(F("Connected to the WiFi network: "));
   Serial.println(ssid);
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(F("Connected to WiFi:"));
+  display.println(ssid);
   Serial.print(F("IP: "));
   Serial.println(WiFi.localIP());
+  display.println(F("IP:"));
+  display.println(WiFi.localIP());
+  display.display();
+  delay(3000);
 }
 
 unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
@@ -239,31 +264,139 @@ int sendStatus(String* time_human) {
   return res;
 }
 
+void displayStatus(int result_api, String* update_time) { // display has 6 lines for basic text println
+  display.clearDisplay();
+  display.setCursor(0,0);
+
+  // door
+  display.print("Door ");
+  switch (door) {
+    case 0:
+      display.println(F("CLOSED"));
+      break;
+    case 1:
+      display.println(F("OPEN"));
+      break;
+    case 2:
+      display.println(F("UNKOWN"));
+      break;
+    default:
+      display.println(F("?ERROR?"));
+      break;
+  }
+
+  // temp and hum
+  display.print(F("Temp: "));
+  if (temp < 0) { // because display.print accepts 32-bit unsigned int
+    display.print("-");
+    display.print(int(-temp)); //? works?
+  } else {
+    display.print(int(temp));
+  }
+  display.print(F("°C, "));
+  display.print(F("Hum: "));
+  display.print(int(hum));
+  display.println(F("%"));
+
+  // wifi status
+  display.print(F("WiFi "));
+  switch ( WiFi.status() ) {
+    case WL_CONNECTED:
+      display.print(F("CONNECTED "));
+      display.println(WiFi.localIP());
+      break;
+    default:
+      display.println(F("!disconnected!"));
+      break;
+  }
+
+  // last update time
+  display.print(F("Last update: "));
+  display.println(F(&update_time));
+
+  // api call result
+  display.print(F("API call "));
+  switch (result_api) {
+    case 0:
+      display.println(F("success"));
+      break;
+    case 1:
+      display.println(F("FAILED"));
+      break;
+    default:
+      display.println(F("UNKNOWN?"));
+      break;
+  }
+  
+  // show on screen
+  display.display();
+}
+
 // print temp sensor error if one occurs
 void printAhtStatus() {
+  //? display.clearDisplay(); // needed ?
   switch ( aht20.getStatus() ) {
     case AHTXX_NO_ERROR:
       Serial.println(F("no error"));
+      //display.clearDisplay();
+      //display.setCursor(0,0);
+      //display.println(F("no aht error"));
+      //display.display();
+      //delay(200);
       break;
 
     case AHTXX_BUSY_ERROR:
       Serial.println(F("sensor busy, increase polling time"));
+      display.setCursor(0,0);
+      display.println(F("sensor busy, increase polling time"));
+      display.display();
+      delay(500);
       break;
 
     case AHTXX_ACK_ERROR:
       Serial.println(F("sensor didn't return ACK, not connected, broken, long wires (reduce speed), bus locked by slave (increase stretch limit)"));
+      display.setCursor(0,0);
+      display.println(F("sensor didn't return ACK, not connected, broken, long wires (reduce speed), bus locked by slave (increase stretch limit)"));
+      display.display();
+      delay(500);
       break;
 
     case AHTXX_DATA_ERROR:
       Serial.println(F("received data smaller than expected, not connected, broken, long wires (reduce speed), bus locked by slave (increase stretch limit)"));
+      display.setCursor(0,0);
+      display.println(F("received data smaller than expected, not connected, broken, long wires (reduce speed), bus locked by slave (increase stretch limit)"));
+      display.display();
+      delay(500);
       break;
 
     case AHTXX_CRC8_ERROR:
       Serial.println(F("computed CRC8 not match received CRC8, this feature supported only by AHT2x sensors"));
+      display.setCursor(0,0);
+      display.println(F("computed CRC8 not match received CRC8, this feature supported only by AHT2x sensors"));
+      display.display();
+      delay(500);
       break;
 
     default:
       Serial.println(F("unknown status"));    
+      //display.setCursor(0,0);
+      //display.println(F("unknown status"));
+      //display.display();
+      //delay(500);
       break;
   }
 }
+
+/* --- TEST --- */ // to wake up screen on PIR movement
+//void sleepDisplay(Adafruit_SSD1305 *display) {
+void sleepDisplay() {
+  display.clearDisplay();
+  display->ssd1306_command(SSD1306_DISPLAYOFF);
+}
+//void wakeDisplay(Adafruit_SSD1305 *display) {
+void wakeDisplay() {
+  //? needs hard reset (to RST pin of display) before asking to turn on ?
+  display->ssd1306_command(SSD1306_DISPLAYON);
+  display.clearDisplay();
+}
+
