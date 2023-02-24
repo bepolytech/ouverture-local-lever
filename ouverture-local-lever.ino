@@ -231,19 +231,19 @@ String statusTime() {
 
 int sendStatus(String* time_human) {
   // send data to api server
-  DynamicJsonDocument json_doc(200);
+  //DynamicJsonDocument json_doc(200);
   //StaticJsonDocument<192> json_doc; // prefer static ? 196? fron ArduinoJson Assistant, or 200 ?
 
   // add data to json packet
-  json_doc["door_state"] = door;
-  json_doc["temperature"] = temp;
-  json_doc["humidity"] = hum;
-  json_doc["update_time"] = &time_human;
-  json_doc["update_time_unix"] = epochTime;
+  //json_doc["door_state"] = door;
+  //json_doc["temperature"] = temp;
+  //json_doc["humidity"] = hum;
+  //json_doc["update_time"] = &time_human;
+  //json_doc["update_time_unix"] = epochTime;
   ////json_doc["presence"] = presence; // from PIR sensor ? nahh
 
   String jsonData;
-  serializeJson(json_doc, jsonData);
+  //serializeJson(json_doc, jsonData);
   
   http.begin(wifi_client, API_SERVER);
   http.addHeader("Content-Type", "application/json");
@@ -315,7 +315,7 @@ void displayStatus(int result_api, String* update_time) { // display has 6 lines
 
   // last update time
   display.print(F("Last update: "));
-  display.println(F(&update_time));
+  display.println(F(update_time));
 
   // api call result
   display.print(F("API call "));
@@ -394,12 +394,12 @@ void printAhtStatus() {
 //void sleepDisplay(Adafruit_SSD1305 *display) {
 void sleepDisplay() {
   display.clearDisplay();
-  display->ssd1306_command(SSD1306_DISPLAYOFF);
+  display.ssd1306_command(SSD1306_DISPLAYOFF);
 }
 //void wakeDisplay(Adafruit_SSD1305 *display) {
 void wakeDisplay() {
   //? needs hard reset (to RST pin of display) before asking to turn on ?
-  display->ssd1306_command(SSD1306_DISPLAYON);
+  display.ssd1306_command(SSD1306_DISPLAYON);
   display.clearDisplay();
 }
 
