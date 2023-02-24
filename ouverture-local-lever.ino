@@ -27,11 +27,12 @@
 #define OLED_RESET     -1 // Reset pin
 #define SCREEN_ADDRESS 0x3C // I2C address (0X3C or 0x3D ?)
 
+// params
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
 #define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 3600 seconds offset
 #define API_SERVER "http://192.168.137.100:8000/local" // api server url
-#define LEVER_PIN 4 // pin on which the lever is wired // TODO: check wemos D1 mini pins
-#define LED_PIN 2 // built-in LED is GPIO 2 on NodeMCU v3
+#define LEVER_PIN 4 // or D2 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
+//#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
 const char *ssid = "wifissid"; // wifi ssid
 const char *password = "wifipasswd"; // wifi password
@@ -96,7 +97,7 @@ void setup() {
   // set lever pin to input (pulled high)
   pinMode(LEVER_PIN,INPUT_PULLUP);
 
-  pinMode(LED_PIN,OUTPUT);
+  //pinMode(LED_PIN,OUTPUT);
   pinMode(LED_BUILTIN,OUTPUT);
   
   // check if aht sensor is working
@@ -122,12 +123,13 @@ void loop() {
   // check if lever is closed (door open)
   if ( digitalRead(LEVER_PIN) == LOW ) {
     door = 1; // door is open (lever activated, because pulled high)
-    digitalWrite(LED_PIN, LOW); // LED ON, because active low
-    digitalWrite(LED_BUILTIN, LOW);
+    //digitalWrite(LED_PIN, LOW); // LED ON, because active low
+    digitalWrite(LED_BUILTIN, LOW); // LED ON, because active low
     Serial.println(F("Door is open"));
   } else {
     door = 0;
-    digitalWrite(LED_PIN, HIGH); // LED OFF, because active low
+    //digitalWrite(LED_PIN, HIGH); // LED OFF, because active low
+    digitalWrite(LED_BUILTIN, HIGH); // LED OFF, because active low
     Serial.println(F("Door is closed"));
   }
   
@@ -234,14 +236,11 @@ int sendStatus(String* time_human) {
   json_doc["humidity"] = hum;
   json_doc["update_time"] = &time_human;
   json_doc["update_time_unix"] = epochTime;
-  //json_doc["presence"] = presence; // from PIR sensor ? nahh
+  ////json_doc["presence"] = presence; // from PIR sensor ? nahh
 
   String jsonData;
   serializeJson(json_doc, jsonData);
-
-  //HTTPClient http;
-  //WiFiClient wifi_client;
-  // ^^^^ moved as globals
+  
   http.begin(wifi_client, API_SERVER);
   http.addHeader("Content-Type", "application/json");
   // apply API key as a header named "api_token"
