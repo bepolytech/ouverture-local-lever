@@ -1,12 +1,12 @@
 /*
  * MIT License
  * by Lucas Placentino
- * for the Bureau Etudiant de Polytechnique (BEP) ULB
+ * for the Bureau Etudiant de Polytechnique (BEP) ASBL - ULB
  *
  * Open status lever code for esp8266
  * 
  * Get lever state (and temp&hum data) every X seconds, then send data to api server
- * (then the Wordpress site will get the status from the api server)
+ * (then the Wordpress site will get the status from the api server and show it to users)
  * 
  */
  
@@ -21,6 +21,8 @@
 #include <SPI.h> // required here (even if we're only using I2C)
 #include <Wire.h>
 
+#include "Secrets.h" // TODO: check if this is the right way to do it
+
 // OLED screen
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -30,14 +32,16 @@
 // params
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
 #define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 3600 seconds offset
-#define API_SERVER "http://192.168.137.100:8000/local" // api server url
 #define LEVER_PIN 4 // or D2 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
-const char *ssid = "wifissid"; // wifi ssid
-const char *password = "wifipasswd"; // wifi password
-const char api_key[] = "yourapikey"; //? const char *api_key = ... ?
-  
+
+// defined in Secrets.h :
+//#define API_SERVER "http://192.168.137.100:8000/local" // api server url
+//const char *ssid = "wifissid"; // wifi ssid
+//const char *password = "wifipasswd"; // wifi password
+//const char api_key[] = "yourapikey"; // make it a *pointer ?
+
 // Temp sensor
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21) TODO: check address? (from example)
 float ahtValue; 
@@ -185,7 +189,7 @@ void initWifi() {
   
   // init wifi
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.println(F("Connecting to WiFi"));
   display.println("");
   display.display(); //?
@@ -196,11 +200,11 @@ void initWifi() {
     display.display();
   }
   Serial.print(F("Connected to the WiFi network: "));
-  Serial.println(ssid);
+  Serial.println(WIFI_SSID);
   display.clearDisplay();
   display.setCursor(0,0);
   display.println(F("Connected to WiFi:"));
-  display.println(ssid);
+  display.println(WIFI_SSID);
   Serial.print(F("IP: "));
   Serial.println(WiFi.localIP());
   display.println(F("IP:"));
@@ -244,7 +248,7 @@ int sendStatus(String* time_human) {
   http.begin(wifi_client, API_SERVER);
   http.addHeader("Content-Type", "application/json");
   // apply API key as a header named "api_token"
-  http.addHeader("api_token", api_key);
+  http.addHeader("api_token", API_KEY);
   Serial.println(jsonData);
   int httpResponseCode = http.PUT(jsonData);
   int res;
