@@ -166,7 +166,7 @@ void loop() {
   
   // send status as json to api server
   int result;
-  result = sendStatus(&update_time);
+  result = sendStatus(update_time);
   // checks is error occured on api PUT
   if ( result == 0) {
     Serial.println(F("sendStatus success"));
@@ -175,7 +175,7 @@ void loop() {
   }
 
   //display current status on OLED screen
-  displayStatus(result, &update_time);
+  displayStatus(result, update_time);
 
   delay(REFRESH_TIME); // see #defines
 }
@@ -229,7 +229,7 @@ String statusTime() {
   return now;
 }
 
-int sendStatus(String* time_human) {
+int sendStatus(String time_human) {
   // send data to api server
   //DynamicJsonDocument json_doc(200);
   //StaticJsonDocument<192> json_doc; // prefer static ? 196? fron ArduinoJson Assistant, or 200 ?
@@ -267,7 +267,7 @@ int sendStatus(String* time_human) {
   return res;
 }
 
-void displayStatus(int result_api, String* update_time) { // display has 6 lines for basic text println
+void displayStatus(int result_api, String update_time) { // display has 6 lines for basic text println
   display.clearDisplay();
   display.setCursor(0,0);
 
@@ -315,7 +315,7 @@ void displayStatus(int result_api, String* update_time) { // display has 6 lines
 
   // last update time
   display.print(F("Last update: "));
-  display.println(F(update_time));
+  display.println(update_time);
 
   // api call result
   display.print(F("API call "));
