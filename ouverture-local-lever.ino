@@ -12,12 +12,13 @@
  
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h> //! TODO
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <AHTxx.h>
 #include <ArduinoJson.h>
-#include <Adafruit_SSD1306.h> //TODO
-#include <Adafruit_GFX.h> // required ?
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
 #include <SPI.h> // required here (even if we're only using I2C)
 #include <Wire.h>
 
@@ -31,7 +32,7 @@
 
 // params
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
-#define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 3600 seconds offset
+#define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 1*3600 seconds offset
 #define LEVER_PIN 4 // or D2 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
@@ -57,8 +58,16 @@ unsigned int hum;
 int temp;
 int door;
 
-HTTPClient http;
+HTTPClient http; //https? TODO
 WiFiClient wifi_client;
+
+//WiFiClientSecure *secure_client = new WiFiClientSecure; // TODO
+
+
+//WiFiClientSecure wifiSecure;
+//HttpClient client(wifiSecure, "api.bepolytech.be", 443);
+
+//X509List cert(cert_DigiCert_Global_Root_CA); //nah
 
 // screen init
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -94,7 +103,18 @@ void setup() {
 
   // start wifi
   initWifi();
-  
+
+  //config ntp for x.509 validation (for https)
+  //configTime(NTP_OFFSET, 0, "be.pool.ntp.org", "europe.pool.ntp.org", "pool.ntp.org");
+  /*
+  if(secure_client) { // TODO
+    // set secure client without certificate
+    secure_client->setInsecure();
+
+    ////HTTPClient https;
+  */
+
+
   // initially door is UNKNOWN (=2)
   door = 2;
   
@@ -164,9 +184,11 @@ void loop() {
     printAhtStatus(); //print temperature command status not humidity!!! RH measurement use same 6-bytes from T measurement
   }
   
+  String info = "No info";
+
   // send status as json to api server
   int result;
-  result = sendStatus(update_time);
+  result = sendStatus(update_time, info);
   // checks is error occured on api PUT
   if ( result == 0) {
     Serial.println(F("sendStatus success"));
@@ -229,7 +251,7 @@ String statusTime() {
   return now;
 }
 
-int sendStatus(String time_human) {
+int sendStatus(String time_human, String info) {
   // send data to api server
   //DynamicJsonDocument json_doc(200);
   //StaticJsonDocument<192> json_doc; // prefer static ? 196? fron ArduinoJson Assistant, or 200 ?
@@ -238,19 +260,24 @@ int sendStatus(String time_human) {
   //json_doc["door_state"] = door;
   //json_doc["temperature"] = temp;
   //json_doc["humidity"] = hum;
-  //json_doc["update_time"] = &time_human;
+  //json_doc["update_time"] = time_human;
   //json_doc["update_time_unix"] = epochTime;
   ////json_doc["presence"] = presence; // from PIR sensor ? nahh
 
   String jsonData;
   //serializeJson(json_doc, jsonData);
+
+  // or just don't use ArduinoJson
+  jsonData = "{\"door_state\":\"" + String(door) + "\",\"update_time\":\"" + String(time_human) + "\",\"update_time_unix\":\"" + String(epochTime) + "\",\"info\":\"" + String(info) + "\",\"temperature\":\"" + String(temp) + "\",\"humidity\":\"" + String(hum) + "\"}";
+  Serial.println(jsonData);
   
   http.begin(wifi_client, API_SERVER);
+  //http.begin(*secure_client, API_SERVER); //https TODO
   http.addHeader("Content-Type", "application/json");
   // apply API key as a header named "api_token"
   http.addHeader("api_token", API_KEY);
-  Serial.println(jsonData);
-  int httpResponseCode = http.PUT(jsonData);
+  Serial.println(F("Sending JSON data"));
+  int httpResponseCode = http.PUT(jsonData); // send data and get response
   int res;
   if (httpResponseCode > 0) {
     String response = http.getString();
