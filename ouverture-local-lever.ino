@@ -43,7 +43,7 @@
 //const char *password = "wifipasswd"; // wifi password
 //const char api_key[] = "yourapikey"; // make it a *pointer ?
 
-// Temp sensor
+// Temp sensor // 0x7E?
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type (we use an aht21) TODO: check address? (from example)
 float ahtValue; 
 
@@ -77,6 +77,8 @@ void setup() {
 
   // start serial bus
   Serial.begin(9600);
+
+  //scanI2C();
 
   // initialize the OLED object
   while (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -125,7 +127,7 @@ void setup() {
   pinMode(LED_BUILTIN,OUTPUT);
   
   // check if aht sensor is working
-  while (aht20.begin() != true) { //for ESP-01 use aht20.begin(0, 2);
+  while (aht20.begin() != true) { //for ESP-01 use aht20.begin(0, 2); // TODO remove comments
     Serial.println(F("AHT2x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
     delay(3000); // 3sec
   }
@@ -323,7 +325,7 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
   } else {
     display.print(int(temp));
   }
-  display.print(F("°C, "));
+  display.print(F("C, "));
   display.print(F("Hum: "));
   display.print(int(hum));
   display.println(F("%"));
@@ -332,7 +334,7 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
   display.print(F("WiFi "));
   switch ( WiFi.status() ) {
     case WL_CONNECTED:
-      display.print(F("CONNECTED "));
+      display.print(F("IP "));
       display.println(WiFi.localIP());
       break;
     default:
@@ -364,7 +366,7 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
 
 // print temp sensor error if one occurs
 void printAhtStatus() {
-  //? display.clearDisplay(); // needed ?
+  display.clearDisplay(); // needed ?
   switch ( aht20.getStatus() ) {
     case AHTXX_NO_ERROR:
       Serial.println(F("no error"));
@@ -415,6 +417,7 @@ void printAhtStatus() {
       //delay(500);
       break;
   }
+  display.clearDisplay();
 }
 
 /* --- TEST --- */ // to wake up screen on PIR movement
@@ -428,5 +431,52 @@ void wakeDisplay() {
   //? needs hard reset (to RST pin of display) before asking to turn on ?
   display.ssd1306_command(SSD1306_DISPLAYON);
   display.clearDisplay();
+}
+
+void scanI2C() {
+  Wire.begin();
+
+  int i = 0;
+  while (i < 6) {
+  byte error, address;
+  int nDevices;
+ 
+  Serial.println("Scanning...");
+ 
+  nDevices = 0;
+  for(address = 1; address < 127; address++ )
+  {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+ 
+    if (error == 0)
+    {
+      Serial.print("I2C device found at address 0x");
+      if (address<16)
+        Serial.print("0");
+      Serial.print(address,HEX);
+      Serial.println("  !");
+ 
+      nDevices++;
+    }
+    else if (error==4)
+    {
+      Serial.print("Unknown error at address 0x");
+      if (address<16)
+        Serial.print("0");
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0)
+    Serial.println("No I2C devices found\n");
+  else
+    Serial.println("done\n");
+ 
+  delay(5000);           // wait 5 seconds for next scan
+  i++;
+  }
 }
 
