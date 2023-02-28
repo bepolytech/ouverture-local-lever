@@ -331,7 +331,7 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
   display.println(F("%"));
 
   // wifi status
-  display.print(F("WiFi "));
+  display.print(F("WiFi"));
   switch ( WiFi.status() ) {
     case WL_CONNECTED:
       display.print(F("IP "));
