@@ -33,7 +33,7 @@
 // params
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
 #define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 1*3600 seconds offset
-#define LEVER_PIN 4 // or D2 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
+#define LEVER_PIN 14 // or D5 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
 
@@ -218,7 +218,7 @@ void initWifi() {
   display.println("");
   display.display(); //?
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     Serial.print(F("."));
     display.print(F("."));
     display.display();
