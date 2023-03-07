@@ -22,7 +22,8 @@
 #include <SPI.h> // required here (even if we're only using I2C)
 #include <Wire.h>
 
-#include "Secrets.h" // TODO: check if this is the right way to do it
+#include "Secrets.h" // secrets: wifi ssid, wifi pasword and api key
+#include "Params.h" // params: gpio pins, i2c address etc
 
 // OLED screen
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -72,7 +73,16 @@ WiFiClient wifi_client;
 // screen init
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+bool pir_detected = false;
+bool lever_changed = false;
+bool btn_pressed = false;
+bool setup_sequence;
+
+unsigned long timer_now = millis();
+unsigned long timer_last = timer_now;
+
 void setup() {
+  setup_sequence = true;
   // setup wifi, NTP, API, etc
 
   // start serial bus
@@ -121,10 +131,22 @@ void setup() {
   door = 2;
   
   // set lever pin to input (pulled high)
-  pinMode(LEVER_PIN,INPUT_PULLUP);
+  pinMode(LEVER_PIN, INPUT_PULLUP);
+  attachInterrrupt(digitalPinToInterrupt(LEVER_PIN), ISR_LEVER, CHANGE);
+
+
+  // set btn pin to input (pulled high)
+  pinMode(BTN_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BTN_PIN), ISR_BTN, FALLING);
+
+
+  // set PIR pin to input
+  pinMode(PIR_PIN, INPUT_PULLDOWN); // TODO: PULLDOWN?
+  attachInterrupt(digitalPinToInterrupt(PIR_PIN), ISR_PIR, RISING);
+
 
   //pinMode(LED_PIN,OUTPUT);
-  pinMode(LED_BUILTIN,OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   
   // check if aht sensor is working
   int i = 0;
@@ -140,11 +162,16 @@ void setup() {
 
   // clear display
   display.clearDisplay();
+  setup_sequence = false;
 }
 
 void loop() {
+  timer_now = millis(); // TODO: use timer instead of delay()s
+
   // check every X seconds if the lever is closed, and send status with current time
+  
   Serial.println(F("Checking lever status"));
+  
   // updates NTP
   timeClient.update();
   
@@ -435,6 +462,7 @@ void wakeDisplay() {
   display.clearDisplay();
 }
 
+// I2C scan, for dev purposes
 void scanI2C() {
   Wire.begin();
 
@@ -482,3 +510,36 @@ void scanI2C() {
   }
 }
 
+ICACHE_RAM_ATTR void ISR_LEVER() {
+  lever_changed = true;
+  Serial.println(F("Lever change interrupt"));
+  if (digitalRead(LEVER_PIN) == LOW) {
+    Serial.println(F("Lever activated, setting door to open"));
+    digitalWrite(LED_BUILTIN, LOW);
+    door = 1;
+  } else if (digitalRead(LEVER_PIN) == HIGH) {
+    Serial.println(F("Lever deactivated, setting door to closed"));
+    digitalWrite(LED_BUILTIN, HIGH);
+    door = 0;
+  } else {
+    Serial.println(F("Lever pin unknown, problem? setting door to unknown"));
+    digitalWrite(LED_BUILTIN, HIGH);
+    door = 2;
+  }
+  displayStatus(); //TODO: get time and api result
+  lever_changed = false;
+}
+
+ICACHE_RAM_ATTR void ISR_BTN() {
+  btn_pressed = true;
+  Serial.println(F("Button pressed, showing screen"));
+  displayStatus(); //TODO: get time and api result
+  btn_pressed = false;
+}
+
+ICACHE_RAM_ATTR void ISR_PIR() {
+  pir_detected = true;
+  Serial.println(F("PIR detected, showing screen"));
+  displayStatus(); //TODO: get time and api result
+  pir_detected = false;
+}
