@@ -127,9 +127,11 @@ void setup() {
   pinMode(LED_BUILTIN,OUTPUT);
   
   // check if aht sensor is working
-  while (aht20.begin() != true) { //for ESP-01 use aht20.begin(0, 2); // TODO remove comments
+  int i = 0;
+  while (aht20.begin() != true && i < 7) { //for ESP-01 use aht20.begin(0, 2); // TODO remove comments
     Serial.println(F("AHT2x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
     delay(3000); // 3sec
+    i++;
   }
   Serial.println(F("AHT20 OK"));
 
