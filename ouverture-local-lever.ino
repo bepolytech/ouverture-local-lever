@@ -58,6 +58,7 @@ unsigned long epochTime;
 unsigned int hum;
 int temp;
 int door;
+int api_res;
 
 HTTPClient http; //https? TODO
 WiFiClient wifi_client;
@@ -79,7 +80,8 @@ bool btn_pressed = false;
 bool setup_sequence;
 
 unsigned long timer_now = millis();
-unsigned long timer_last = timer_now;
+
+unsigned long timer_PIR_last = timer_now;
 
 void setup() {
   setup_sequence = true;
@@ -104,7 +106,7 @@ void setup() {
   display.setCursor(0,0);
   display.fillRect(0, 0, 127, 63, WHITE);
   display.display();
-  delay(50);
+  delay(100);
 
   // Display Setup Text
   display.clearDisplay();
@@ -235,7 +237,7 @@ void loop() {
 
 void initWifi() {
   display.clearDisplay();
-  display.setCursor(0,28);
+  display.setCursor(0,0);
   display.println(F("Connecting to WiFi"));
   display.display();
   delay(100);
@@ -314,15 +316,15 @@ int sendStatus(String time_human, String info) {
     String response = http.getString();
     Serial.println(httpResponseCode);
     Serial.println(response);
-    res = 0;
+    api_res = 0;
   } else {
     Serial.println(F("Error on HTTP request"));
     Serial.println(httpResponseCode);
-    res = 1;
+    api_res = 1;
   }
   http.end();
   // return successful api call or not
-  return res;
+  return api_res;
 }
 
 void displayStatus(int result_api, String update_time) { // display has 6 lines for basic text println
@@ -360,10 +362,10 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
   display.println(F("%"));
 
   // wifi status
-  display.print(F("WiFi"));
+  //display.print(F("WiFi"));
   switch ( WiFi.status() ) {
     case WL_CONNECTED:
-      display.print(F("IP "));
+      display.print(F("IP: "));
       display.println(WiFi.localIP());
       break;
     default:
@@ -538,8 +540,12 @@ ICACHE_RAM_ATTR void ISR_BTN() {
 }
 
 ICACHE_RAM_ATTR void ISR_PIR() {
-  pir_detected = true;
-  Serial.println(F("PIR detected, showing screen"));
-  displayStatus(); //TODO: get time and api result
-  pir_detected = false;
+  if ( millis() - time_PIR_last > 3000) {
+    pir_detected = true;
+    
+    Serial.println(F("PIR detected, showing screen"));
+    displayStatus(); //TODO: get time and api result
+    pir_detected = false;
+    timer_PIR_last = millis();
+  }
 }

@@ -6,7 +6,7 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET     -1 // Reset pin, -1=no reset pin
-#define SCREEN_ADDRESS 0x3C // I2C address (0X3C or 0x3D ?)
+#define SCREEN_ADDRESS 0x3C // I2C address (0X3C or 0x3D ?) // use I2CScan func to find
 
 // params
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
@@ -15,7 +15,7 @@
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define BTN_PIN 12 // or D6 (for NodeMCU) // TODO
 #define PIR_PIN 10 // TODO 
-#define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
+#define REFRESH_TIME 5000 //ms between each refresh and api call (30sec, 5sec for testing)
 
 // defined in Secrets.h :
 //#define API_SERVER "http://192.168.137.100:8000/local" // api server url
