@@ -16,6 +16,7 @@
 #define BTN_PIN 12 // or D6 (for NodeMCU) // TODO
 #define PIR_PIN 10 // TODO 
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec, 5sec for testing)
+#define PIR_DELAY 3000 //min time between PIR detections
 
 // defined in Secrets.h :
 //#define API_SERVER "http://192.168.137.100:8000/local" // api server url

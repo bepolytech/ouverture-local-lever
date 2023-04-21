@@ -134,7 +134,7 @@ void setup() {
   
   // set lever pin to input (pulled high)
   pinMode(LEVER_PIN, INPUT_PULLUP);
-  attachInterrrupt(digitalPinToInterrupt(LEVER_PIN), ISR_LEVER, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(LEVER_PIN), ISR_LEVER, CHANGE);
 
 
   // set btn pin to input (pulled high)
@@ -143,7 +143,9 @@ void setup() {
 
 
   // set PIR pin to input
-  pinMode(PIR_PIN, INPUT_PULLDOWN); // TODO: PULLDOWN?
+  //pinMode(PIR_PIN, INPUT_PULLDOWN_16); // TODO: PULLDOWN?
+  pinMode(PIR_PIN, INPUT);
+  digitalWrite(PIR_PIN, LOW); // equiv to pulldown
   attachInterrupt(digitalPinToInterrupt(PIR_PIN), ISR_PIR, RISING);
 
 
@@ -220,17 +222,16 @@ void loop() {
   String info = "No info";
 
   // send status as json to api server
-  int result;
-  result = sendStatus(update_time, info);
+  api_res = sendStatus(update_time, info);
   // checks is error occured on api PUT
-  if ( result == 0) {
+  if ( api_res == 0) {
     Serial.println(F("sendStatus success"));
   } else {
     Serial.println(F("sendStatus error"));
   }
 
   //display current status on OLED screen
-  displayStatus(result, update_time);
+  displayStatus(update_time);
 
   delay(REFRESH_TIME); // see #defines
 }
@@ -246,7 +247,7 @@ void initWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.println(F("Connecting to WiFi"));
-  display.println("");
+  display.println(F(""));
   display.display(); //?
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -327,12 +328,12 @@ int sendStatus(String time_human, String info) {
   return api_res;
 }
 
-void displayStatus(int result_api, String update_time) { // display has 6 lines for basic text println
+void displayStatus(String update_time) { // display has 6 lines for basic text println
   display.clearDisplay();
   display.setCursor(0,0);
 
   // door
-  display.print("Door ");
+  display.print(F("Door "));
   switch (door) {
     case 0:
       display.println(F("CLOSED"));
@@ -351,7 +352,7 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
   // temp and hum
   display.print(F("Temp: "));
   if (temp < 0) { // because display.print accepts 32-bit unsigned int
-    display.print("-");
+    display.print(F("-"));
     display.print(int(-temp)); //? works?
   } else {
     display.print(int(temp));
@@ -374,12 +375,14 @@ void displayStatus(int result_api, String update_time) { // display has 6 lines 
   }
 
   // last update time
-  display.print(F("Last update: "));
-  display.println(update_time);
+  if (update_time != "") {
+    display.print(F("Last update: "));
+    display.println(update_time);
+  }
 
   // api call result
   display.print(F("API call "));
-  switch (result_api) {
+  switch (api_res) {
     case 0:
       display.println(F("success"));
       break;
@@ -464,6 +467,7 @@ void wakeDisplay() {
   display.clearDisplay();
 }
 
+/*
 // I2C scan, for dev purposes
 void scanI2C() {
   Wire.begin();
@@ -511,9 +515,11 @@ void scanI2C() {
   i++;
   }
 }
+*/
 
 ICACHE_RAM_ATTR void ISR_LEVER() {
   lever_changed = true;
+  wakeDisplay();
   Serial.println(F("Lever change interrupt"));
   if (digitalRead(LEVER_PIN) == LOW) {
     Serial.println(F("Lever activated, setting door to open"));
@@ -528,23 +534,28 @@ ICACHE_RAM_ATTR void ISR_LEVER() {
     digitalWrite(LED_BUILTIN, HIGH);
     door = 2;
   }
-  displayStatus(); //TODO: get time and api result
+  displayStatus(""); //TODO: get time and api result
   lever_changed = false;
 }
 
 ICACHE_RAM_ATTR void ISR_BTN() {
   btn_pressed = true;
   Serial.println(F("Button pressed, showing screen"));
-  displayStatus(); //TODO: get time and api result
+  wakeDisplay();
+  displayStatus(""); //TODO: get time and api result
+
+  // do something else?
+
   btn_pressed = false;
 }
 
 ICACHE_RAM_ATTR void ISR_PIR() {
-  if ( millis() - time_PIR_last > 3000) {
+  if ( millis() - timer_PIR_last > PIR_DELAY) {
     pir_detected = true;
-    
+    wakeDisplay();
     Serial.println(F("PIR detected, showing screen"));
-    displayStatus(); //TODO: get time and api result
+    displayStatus(""); //TODO: get time and api result
+
     pir_detected = false;
     timer_PIR_last = millis();
   }
