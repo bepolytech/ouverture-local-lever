@@ -83,6 +83,8 @@ unsigned long timer_now = millis();
 
 unsigned long timer_PIR_last = timer_now;
 
+unsigned long awaken_display_timer = timer_now;
+
 void setup() {
   setup_sequence = true;
   // setup wifi, NTP, API, etc
@@ -171,6 +173,11 @@ void setup() {
 
 void loop() {
   timer_now = millis(); // TODO: use timer instead of delay()s
+
+  if ( timer_now - awaken_display_timer > (PIR_DELAY*2)) {
+    sleepDisplay();
+    //TODO: ?
+  }
 
   // check every X seconds if the lever is closed, and send status with current time
   
@@ -465,6 +472,7 @@ void wakeDisplay() {
   //? needs hard reset (to RST pin of display) before asking to turn on ?
   display.ssd1306_command(SSD1306_DISPLAYON);
   display.clearDisplay();
+  awaken_display_timer = millis();
 }
 
 /*
@@ -534,7 +542,7 @@ ICACHE_RAM_ATTR void ISR_LEVER() {
     digitalWrite(LED_BUILTIN, HIGH);
     door = 2;
   }
-  displayStatus(""); //TODO: get time and api result
+  displayStatus(""); //TODO: get time ?
   lever_changed = false;
 }
 
@@ -542,7 +550,7 @@ ICACHE_RAM_ATTR void ISR_BTN() {
   btn_pressed = true;
   Serial.println(F("Button pressed, showing screen"));
   wakeDisplay();
-  displayStatus(""); //TODO: get time and api result
+  displayStatus(""); //TODO: get time ?
 
   // do something else?
 
@@ -554,7 +562,7 @@ ICACHE_RAM_ATTR void ISR_PIR() {
     pir_detected = true;
     wakeDisplay();
     Serial.println(F("PIR detected, showing screen"));
-    displayStatus(""); //TODO: get time and api result
+    displayStatus(""); //TODO: get time ?
 
     pir_detected = false;
     timer_PIR_last = millis();
