@@ -178,8 +178,8 @@ void loop() {
   timer_now = millis(); // TODO: use timer instead of delay()s
 
   if ( timer_now - awaken_display_timer > (PIR_DELAY*2)) {
-    sleepDisplay();
-    //TODO: ?
+    //sleepDisplay();
+    //TODO: ? ------------
   }
 
   // check every X seconds if the lever is closed, and send status with current time
@@ -298,40 +298,51 @@ String statusTime() {
 int sendStatus(String time_human, String info) {
   // send data to api server
   //DynamicJsonDocument json_doc(200);
-  //StaticJsonDocument<192> json_doc; // prefer static ? 196? fron ArduinoJson Assistant, or 200 ?
+  //StaticJsonDocument<192> json_doc; // 192? prefer static ? 196? from ArduinoJson Assistant, or 200 ?
 
   // add data to json packet
   //json_doc["door_state"] = door;
+  //json_doc["info"] = info;
   //json_doc["temperature"] = temp;
   //json_doc["humidity"] = hum;
   //json_doc["update_time"] = time_human;
   //json_doc["update_time_unix"] = epochTime;
-  ////json_doc["presence"] = presence; // from PIR sensor ? nahh
+  //json_doc["presence"] = presence; // from PIR sensor ? nahh
 
-  String jsonData;
+  //String jsonData;
   //serializeJson(json_doc, jsonData);
 
   // or just don't use ArduinoJson
-  jsonData = "{\"door_state\":" + String(door) + ",\"update_time\":\"" + String(time_human) + "\",\"update_time_unix\":" + String(epochTime) + ",\"info\":\"" + String(info) + "\",\"temperature\":" + String(temp) + ",\"humidity\":" + String(hum) + "}";
-  Serial.println(jsonData);
+  //jsonData = "{\"door_state\": " + String(door) + ", \"info\": \"" + String(info) + "\", \"update_time\": \"" + String(time_human) + "\", \"update_time_unix\": " + String(epochTime) + ", \"temperature\": " + String(temp) + ", \"humidity\": " + String(hum) + "}";
+  //Serial.println(jsonData);
+
+  String sendData;
+  sendData = "door_state=" + String(door) + "&info=" + String(info) + "&update_time=" + String(time_human) + "&update_time_unix=" + String(epochTime) + "&temperature=" + String(temp) + "&humidity=" + String(hum);
   
   http.begin(wifi_client, API_SERVER);
   //http.begin(*secure_client, API_SERVER); //https TODO
-  http.addHeader("Content-Type", "application/json");
+  //http.addHeader("Content-Type", "application/json");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   // apply API key as a header named "api_token"
   http.addHeader("api_token", API_KEY);
-  Serial.println(F("Sending JSON data"));
-  int httpResponseCode = http.PUT(jsonData); // send data and get response
+  Serial.println(F("Sending API data"));
+  //int httpResponseCode = http.PUT(jsonData); // send data and get response
+  int httpResponseCode = http.PUT(sendData); // send data and get response
   int res;
   if (httpResponseCode > 0) {
     String response = http.getString();
     Serial.println(httpResponseCode);
     Serial.println(response);
-    api_res = 0;
+    if ( httpResponseCode == 200 ) {
+      api_res = 0;
+    } else {
+      api_res = httpResponseCode;
+    }
+    //api_res = 0;
   } else {
     Serial.println(F("Error on HTTP request"));
     Serial.println(httpResponseCode);
-    api_res = 1;
+    api_res = -1;
   }
   http.end();
   // return successful api call or not
@@ -393,14 +404,15 @@ void displayStatus(String update_time) { // display has 6 lines for basic text p
   // api call result
   display.print(F("API call "));
   switch (api_res) {
-    case 0:
+    case 200:
       display.println(F("success"));
       break;
-    case 1:
+    case -1:
       display.println(F("FAILED"));
       break;
     default:
-      display.println(F("UNKNOWN?"));
+      display.print(F("F CODE "));
+      display.println(api_res);
       break;
   }
   
