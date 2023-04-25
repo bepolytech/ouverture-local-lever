@@ -25,6 +25,8 @@
 #include "Secrets.h" // secrets: wifi ssid, wifi pasword and api key
 #include "Params.h" // params: gpio pins, i2c address etc
 
+// defined in Params.h :
+/*
 // OLED screen
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -37,6 +39,7 @@
 #define LEVER_PIN 14 // or D5 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec)
+*/
 
 // defined in Secrets.h :
 //#define API_SERVER "http://192.168.137.100:8000/local" // api server url
