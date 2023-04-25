@@ -312,7 +312,7 @@ int sendStatus(String time_human, String info) {
   //serializeJson(json_doc, jsonData);
 
   // or just don't use ArduinoJson
-  jsonData = "{\"door_state\":\"" + String(door) + "\",\"update_time\":\"" + String(time_human) + "\",\"update_time_unix\":\"" + String(epochTime) + "\",\"info\":\"" + String(info) + "\",\"temperature\":\"" + String(temp) + "\",\"humidity\":\"" + String(hum) + "\"}";
+  jsonData = "{\"door_state\":" + String(door) + ",\"update_time\":\"" + String(time_human) + "\",\"update_time_unix\":" + String(epochTime) + ",\"info\":\"" + String(info) + "\",\"temperature\":" + String(temp) + ",\"humidity\":" + String(hum) + "}";
   Serial.println(jsonData);
   
   http.begin(wifi_client, API_SERVER);

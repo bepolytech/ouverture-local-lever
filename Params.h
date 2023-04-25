@@ -14,7 +14,7 @@
 #define LEVER_PIN 14 // or D5 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define BTN_PIN 12 // or D6 (for NodeMCU) // TODO
-#define PIR_PIN 10 // TODO 
+#define PIR_PIN 10 // or SD3 (fore NodeMCU) // TODO
 #define REFRESH_TIME 5000 //ms between each refresh and api call (30sec, 5sec for testing)
 #define PIR_DELAY 3000 //minimum time between PIR detections
 
