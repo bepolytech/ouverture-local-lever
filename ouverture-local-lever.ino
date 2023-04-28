@@ -316,20 +316,22 @@ int sendStatus(String time_human, String info) {
   //jsonData = "{\"door_state\": " + String(door) + ", \"info\": \"" + String(info) + "\", \"update_time\": \"" + String(time_human) + "\", \"update_time_unix\": " + String(epochTime) + ", \"temperature\": " + String(temp) + ", \"humidity\": " + String(hum) + "}";
   //Serial.println(jsonData);
 
-  String sendData;
-  sendData = "door_state=" + String(door) + "&info=" + String(info) + "&update_time=" + String(time_human) + "&update_time_unix=" + String(epochTime) + "&temperature=" + String(temp) + "&humidity=" + String(hum);
+  String sentData;
+  sentData = "door_state=" + String(door) + "&update_time_unix=" + String(epochTime) + "&temperature=" + String(temp) + "&humidity=" + String(hum);
   Serial.println(sendData);
 
   //http.begin(wifi_client, "http://"+API_SERVER_ADDRESS+":"+API_SERVER_PORT+API_URL);
   http.begin(wifi_client, API_SERVER);
   //http.begin(*secure_client, API_SERVER); //https TODO
   //http.addHeader("Content-Type", "application/json");
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  //http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+  http.addHeader("accept", "application/json");
   // apply API key as a header named "api_token"
   http.addHeader("api_token", API_KEY);
   Serial.println(F("Sending API data"));
   //int httpResponseCode = http.PUT(jsonData); // send data and get response
-  int httpResponseCode = http.PUT(sendData); // send data and get response
+  int httpResponseCode = http.PUT(sentData); // send data and get response
   int res;
   if (httpResponseCode > 0) {
     String response = http.getString();
