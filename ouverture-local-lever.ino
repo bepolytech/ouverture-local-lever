@@ -318,7 +318,9 @@ int sendStatus(String time_human, String info) {
 
   String sendData;
   sendData = "door_state=" + String(door) + "&info=" + String(info) + "&update_time=" + String(time_human) + "&update_time_unix=" + String(epochTime) + "&temperature=" + String(temp) + "&humidity=" + String(hum);
-  
+  Serial.println(sendData);
+
+  //http.begin(wifi_client, "http://"+API_SERVER_ADDRESS+":"+API_SERVER_PORT+API_URL);
   http.begin(wifi_client, API_SERVER);
   //http.begin(*secure_client, API_SERVER); //https TODO
   //http.addHeader("Content-Type", "application/json");
