@@ -53,7 +53,8 @@ float ahtValue;
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET);
+//NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET);
+NTPClient timeClient(ntpUDP, NTP_SERVER);
 // NTP epoch time
 unsigned long epochTime;
 
@@ -206,8 +207,8 @@ void loop() {
   epochTime = getEpochTime();
 
   // update human readable time
-  String update_time;
-  update_time = statusTime();
+  //String update_time;
+  //update_time = statusTime();
   
   // getting temp and hum data
   ahtValue = aht20.readTemperature(); //read 6-bytes via I2C, takes 80 milliseconds
@@ -229,10 +230,11 @@ void loop() {
     printAhtStatus(); //print temperature command status not humidity!!! RH measurement use same 6-bytes from T measurement
   }
   
-  String info = "No info";
+  //String info = "No info";
 
   // send status as json to api server
-  api_res = sendStatus(update_time, info);
+  //api_res = sendStatus(info);
+  api_res = sendStatus();
   // checks is error occured on api PUT
   if ( api_res == 0) {
     Serial.println(F("sendStatus success"));
@@ -241,7 +243,7 @@ void loop() {
   }
 
   //display current status on OLED screen
-  displayStatus(update_time);
+  displayStatus();
 
   delay(REFRESH_TIME); // see #defines
 }
@@ -279,7 +281,7 @@ void initWifi() {
   delay(3000);
 }
 
-unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
+unsigned long getEpochTime() {
   // get epoch time from NTP
   unsigned long now = timeClient.getEpochTime();
   Serial.print(F("Epoch time: "));
@@ -287,6 +289,7 @@ unsigned long getEpochTime() { //! OFFSET IS APPLIED TO EPOCH TIME AS WELL
   return now;
 }
 
+/*
 String statusTime() {
   // get formatted string time (human readable) from NTP
   String now = timeClient.getFormattedTime();
@@ -294,8 +297,10 @@ String statusTime() {
   Serial.println(now);
   return now;
 }
+*/
 
-int sendStatus(String time_human, String info) {
+//int sendStatus(String info) {
+int sendStatus() {
   // send data to api server
   //DynamicJsonDocument json_doc(200);
   //StaticJsonDocument<192> json_doc; // 192? prefer static ? 196? from ArduinoJson Assistant, or 200 ?
@@ -353,7 +358,7 @@ int sendStatus(String time_human, String info) {
   return api_res;
 }
 
-void displayStatus(String update_time) { // display has 6 lines for basic text println
+void displayStatus() { // display has 6 lines for basic text println
   display.clearDisplay();
   display.setCursor(0,0);
 
@@ -400,10 +405,8 @@ void displayStatus(String update_time) { // display has 6 lines for basic text p
   }
 
   // last update time
-  if (update_time != "") {
-    display.print(F("Last update: "));
-    display.println(update_time);
-  }
+  display.print(F("Last update:"));
+  display.println(epochTime);
 
   // api call result
   display.print(F("API call "));
@@ -561,7 +564,7 @@ ICACHE_RAM_ATTR void ISR_LEVER() {
     digitalWrite(LED_BUILTIN, HIGH);
     door = 2;
   }
-  displayStatus(""); //TODO: get time ?
+  displayStatus();
   lever_changed = false;
 }
 
@@ -569,7 +572,7 @@ ICACHE_RAM_ATTR void ISR_BTN() {
   btn_pressed = true;
   Serial.println(F("Button pressed, showing screen"));
   wakeDisplay();
-  displayStatus(""); //TODO: get time ?
+  displayStatus();
 
   // do something else?
 
@@ -581,7 +584,7 @@ ICACHE_RAM_ATTR void ISR_PIR() {
     pir_detected = true;
     wakeDisplay();
     Serial.println(F("PIR detected, showing screen"));
-    displayStatus(""); //TODO: get time ?
+    displayStatus();
 
     pir_detected = false;
     timer_PIR_last = millis();

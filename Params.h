@@ -10,7 +10,10 @@
 
 // params
 #define NTP_SERVER "pool.ntp.org" // europe.pool.ntp.org ?
-#define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 1*3600 seconds offset
+
+//deprecated:
+//#define NTP_OFFSET 3600 // UTC+1 (Brussels time CET) = 1*3600 seconds offset
+
 #define LEVER_PIN 14 // or D5 (for nodeMCU) // pin on which the lever is wired // TODO: check wemos D1 mini pins ?
 //#define LED_PIN 2 // or D4 (for nodeMCU) // built-in LED is GPIO 2 on NodeMCU v3, use LED_BUILTIN ?
 #define BTN_PIN 12 // or D6 (for NodeMCU) // TODO
